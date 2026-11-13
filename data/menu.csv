@@ -1,0 +1,8 @@
+type,name,basePrice,extra
+PIZZA,Пепперони,3500,
+PIZZA,Маргарита,3000,
+PIZZA,Төрт ірімшік,3900,
+PIZZA,Гавай,3600,
+DRINK,Кола,700,0.5
+DRINK,Алма шырыны,800,0.3
+DRINK,Су,400,0.5
