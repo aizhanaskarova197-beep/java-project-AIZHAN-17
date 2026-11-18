@@ -1,6 +1,7 @@
 package kz.dodo.app;
 
 import kz.dodo.exception.EmptyOrderException;
+import kz.dodo.exception.WrongItemException;
 import kz.dodo.model.Bill;
 import kz.dodo.model.Courier;
 import kz.dodo.model.Customer;
@@ -57,7 +58,7 @@ public class ConsoleApp {
             boolean running = true;
             while (running) {
                 printMainMenu();
-                int choice = readInt("Таңдаңыз: ", 0, 9);
+                int choice = readInt("Таңдаңыз: ", 0, 10);
                 switch (choice) {
                     case 1 -> showMenu();
                     case 2 -> createOrder();
@@ -68,6 +69,7 @@ public class ConsoleApp {
                     case 7 -> deliverOrHandOver();
                     case 8 -> showHistory();
                     case 9 -> addMenuItem();
+                    case 10 -> runDemo();
                     default -> running = false;
                 }
             }
@@ -114,10 +116,11 @@ public class ConsoleApp {
         System.out.println("3. Тапсырысқа позиция қосу");
         System.out.println("4. Тапсырыстан позицияны жою");
         System.out.println("5. Тапсырысты рәсімдеу (чек + асханаға жіберу)");
-        System.out.println("6. Асхана: келесі тапсырысты дайындау");
-        System.out.println("7. Тапсырысты жеткізу / беру");
+        System.out.println("6. Асхана: келесі тапсырысты дайындау және қаптамасын тексеру");
+        System.out.println("7. Тапсырысты жеткізу / беру (тек тексерілген)");
         System.out.println("8. Тапсырыстар тарихы");
         System.out.println("9. Мәзірге позиция қосу (менеджер)");
+        System.out.println("10. ДЕМО: проблеманың шешімі (Пепперони орнына Гавай)");
         System.out.println("0. Шығу");
     }
 
@@ -203,6 +206,11 @@ public class ConsoleApp {
         System.out.println("Дайындалды: тапсырыс №" + order.getId() + " (статус " + order.getStatus() + ")");
         System.out.println("Асхана тізімі (чектегі құраммен бірдей болуы керек):");
         printComposition(order);
+        if (!packAndVerify(order)) {
+            System.out.println("Тапсырыс READY күйінде, бірақ тексерілмеген. Беру алдында 7-ні таңдап тексеріңіз.");
+            saveOrders();
+            return;
+        }
         if (order.isDelivery()) {
             tryAssignCourier(order);
         } else {
@@ -235,6 +243,10 @@ public class ConsoleApp {
             System.out.println("Мұндай белсенді тапсырыс жоқ.");
             return;
         }
+        if (selected.getStatus() == OrderStatus.READY && !selected.isVerified() && !packAndVerify(selected)) {
+            saveOrders();
+            return;
+        }
         if (selected.getStatus() == OrderStatus.DELIVERING) {
             deliveryService.completeDelivery(selected);
             System.out.println("Тапсырыс жеткізілді. Курьер " + selected.getCourier().getName() + " кезекке оралды.");
@@ -254,7 +266,7 @@ public class ConsoleApp {
         }
         for (Order order : history) {
             String customer = order.getCustomer() == null ? "" : order.getCustomer().getName();
-            System.out.println("--- Тапсырыс №" + order.getId() + ", " + order.getStatus() + ", клиент: " + customer
+            System.out.println("--- Тапсырыс №" + order.getId() + ", " + order.getStatus() + readyMark(order) + ", клиент: " + customer
                     + (order.getCourier() != null ? ", курьер: " + order.getCourier().getName() : ""));
             printComposition(order);
             System.out.printf(Locale.ROOT, "    Барлығы: %.0f тг%n", order.calculateTotal());
@@ -280,6 +292,111 @@ public class ConsoleApp {
     }
 
     // ---------- көмекші әдістер ----------
+
+    /**
+     * Қаптамаға салынған позицияларды енгізіп, тапсырыс құрамымен салыстырады.
+     * Сәйкес келмесе (мысалы, Пепперони орнына Гавай) қате шығады. true - тексеру өтті.
+     */
+    private boolean packAndVerify(Order order) {
+        while (true) {
+            System.out.println("--- Қаптаманы тексеру, тапсырыс №" + order.getId()
+                    + ": қаптамаға салынған позицияларды енгізіңіз ---");
+            showMenu();
+            List<MenuItem> packed = new ArrayList<>();
+            while (true) {
+                int number = readInt("Қаптамадағы келесі позицияның мәзір нөмірі (0 - аяқтау): ", 0, 1000);
+                if (number == 0) {
+                    break;
+                }
+                MenuItem item = menu.getItem(number);
+                if (item == null) {
+                    System.out.println("Мұндай нөмір жоқ.");
+                    continue;
+                }
+                if (item instanceof Pizza pizza) {
+                    item = new Pizza(pizza.getName(), pizza.getBasePrice(), readSize());
+                }
+                packed.add(item);
+            }
+            try {
+                order.verifyPacked(packed);
+                System.out.println("Тексеру сәтті: қаптама тапсырыспен сәйкес.");
+                return true;
+            } catch (WrongItemException e) {
+                System.out.println("ҚАТЕ: " + e.getMessage());
+                int choice = readInt("1 - қаптаманы қайта жинау, 2 - кейін тексеру: ", 1, 2);
+                if (choice == 2) {
+                    return false;
+                }
+            }
+        }
+    }
+
+    /** Демо: бір батырмамен проблема мен оның шешімін көрсетеді (файлдарға тимейді). */
+    private void runDemo() {
+        System.out.println();
+        System.out.println("===== ДЕМО: клиентке басқа пицца берілуін болдырмау =====");
+        Kitchen demoKitchen = new Kitchen();
+        DeliveryService demoDelivery = new DeliveryService();
+        demoDelivery.addCourier(new Courier("Ерлан"));
+        Order order = new Order(0, true, new Customer("Демо клиент", "", "Абай 1"));
+        order.addItem(new Pizza("Пепперони", 3500, 30));
+        order.addItem(new Drink("Кола", 700, 0.5));
+
+        System.out.println("1) Клиент тапсырыс берді:");
+        printComposition(order);
+        try {
+            demoKitchen.addOrder(order);
+        } catch (EmptyOrderException e) {
+            System.out.println(e.getMessage());
+            return;
+        }
+        System.out.println(new Bill(order).print());
+        demoKitchen.cookNext();
+        System.out.println("Тапсырыс дайындалды, статус: " + order.getStatus());
+
+        System.out.println();
+        System.out.println("2) Қате: аспаз қаптамаға Пепперони емес, ГАВАЙ салып жіберді.");
+        List<MenuItem> wrongPack = List.of(new Pizza("Гавай", 3600, 30), new Drink("Кола", 700, 0.5));
+        try {
+            order.verifyPacked(wrongPack);
+        } catch (WrongItemException e) {
+            System.out.println("ЖҮЙЕ ҚАТЕНІ ТАПТЫ: " + e.getMessage());
+        }
+
+        System.out.println();
+        System.out.println("3) Тексерілмеген тапсырысты курьерге беруге тырысамыз...");
+        if (demoDelivery.assignCourier(order)) {
+            System.out.println("Курьерге берілді (бұлай болмауы керек!)");
+        } else {
+            System.out.println("Берілмеді: тапсырыс тексерілмеген (verified = " + order.isVerified() + ").");
+            System.out.println("Клиентке басқа пицца жетпейді.");
+        }
+
+        System.out.println();
+        System.out.println("4) Қаптаманы дұрыстап қайта жинаймыз: Пепперони + Кола.");
+        List<MenuItem> rightPack = List.of(new Pizza("Пепперони", 3500, 30), new Drink("Кола", 700, 0.5));
+        try {
+            order.verifyPacked(rightPack);
+            System.out.println("Тексеру сәтті (verified = " + order.isVerified() + ").");
+        } catch (WrongItemException e) {
+            System.out.println("ҚАТЕ: " + e.getMessage());
+            return;
+        }
+        if (demoDelivery.assignCourier(order)) {
+            System.out.println("Курьер автоматты тағайындалды: " + order.getCourier().getName()
+                    + ", статус: " + order.getStatus());
+        }
+        System.out.println();
+        System.out.println("НӘТИЖЕ: дұрыс пицца ғана клиентке жетеді. Демо аяқталды.");
+    }
+
+    private String readyMark(Order order) {
+        if (order.getStatus() != OrderStatus.READY) {
+            return "";
+        }
+        return order.isVerified() ? " (тексерілген)" : " (ТЕКСЕРІЛМЕГЕН)";
+    }
 
     private boolean hasCurrentOrder() {
         if (currentOrder == null) {

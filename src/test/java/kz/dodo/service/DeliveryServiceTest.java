@@ -5,6 +5,8 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.ArrayList;
+import kz.dodo.exception.WrongItemException;
 import kz.dodo.model.Courier;
 import kz.dodo.model.Drink;
 import kz.dodo.model.Order;
@@ -13,16 +15,17 @@ import org.junit.jupiter.api.Test;
 
 class DeliveryServiceTest {
 
-    private Order readyDeliveryOrder(int id) {
+    private Order readyDeliveryOrder(int id) throws WrongItemException {
         Order order = new Order(id, true, null);
         order.addItem(new Drink("Кола", 700, 0.5));
         order.startCooking();
         order.markReady();
+        order.verifyPacked(new ArrayList<>(order.getItems()));
         return order;
     }
 
     @Test
-    void firstFreeCourierIsAssignedAutomatically() {
+    void firstFreeCourierIsAssignedAutomatically() throws WrongItemException {
         DeliveryService service = new DeliveryService();
         Courier first = new Courier("Ерлан");
         service.addCourier(first);
@@ -35,7 +38,7 @@ class DeliveryServiceTest {
     }
 
     @Test
-    void noCourierMeansOrderWaits() {
+    void noCourierMeansOrderWaits() throws WrongItemException {
         DeliveryService service = new DeliveryService();
         Order order = readyDeliveryOrder(1);
         assertFalse(service.assignCourier(order));
@@ -43,7 +46,7 @@ class DeliveryServiceTest {
     }
 
     @Test
-    void courierReturnsToQueueAfterDelivery() {
+    void courierReturnsToQueueAfterDelivery() throws WrongItemException {
         DeliveryService service = new DeliveryService();
         Courier courier = new Courier("Ерлан");
         service.addCourier(courier);

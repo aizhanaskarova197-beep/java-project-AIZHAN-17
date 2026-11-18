@@ -18,7 +18,7 @@ public class DeliveryService {
 
     /** Дайын тапсырысқа кезектегі бірінші бос курьерді тағайындайды. Курьер жоқ болса false. */
     public boolean assignCourier(Order order) {
-        if (!order.isDelivery() || order.getStatus() != OrderStatus.READY) {
+        if (!order.isDelivery() || order.getStatus() != OrderStatus.READY || !order.isVerified()) {
             return false;
         }
         Courier courier = freeCouriers.poll();

@@ -1,0 +1,15 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "java",
+            "name": "Dodo Pizza (ConsoleApp)",
+            "request": "launch",
+            "mainClass": "kz.dodo.app.ConsoleApp",
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal",
+            "encoding": "UTF-8",
+            "vmArgs": "-Dfile.encoding=UTF-8"
+        }
+    ]
+}

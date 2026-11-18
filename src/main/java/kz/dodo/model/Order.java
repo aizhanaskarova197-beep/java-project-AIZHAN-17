@@ -1,8 +1,12 @@
 package kz.dodo.model;
 
+import kz.dodo.exception.WrongItemException;
+
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Тапсырыс. Құрамы (items) нақты сақталады, статус тек дұрыс ретімен өзгереді:
@@ -15,6 +19,7 @@ public class Order implements Payable {
     private final boolean delivery;
     private final Customer customer;
     private Courier courier;
+    private boolean verified;
 
     public Order(int id, boolean delivery, Customer customer) {
         this.id = id;
@@ -70,6 +75,54 @@ public class Order implements Payable {
         return courier;
     }
 
+    public boolean isVerified() {
+        return verified;
+    }
+
+    /**
+     * Қаптамаға салынған позицияларды тапсырыс құрамымен салыстырады (реті маңызды емес).
+     * Сәйкес келмесе WrongItemException лақтырылады және тапсырыс тексерілмеген болып қалады.
+     */
+    public void verifyPacked(List<MenuItem> packed) throws WrongItemException {
+        if (status != OrderStatus.READY) {
+            throw new IllegalStateException("Тексеру тек READY тапсырысқа жасалады, қазір: " + status);
+        }
+        Map<String, Integer> expected = countByDescription(items);
+        Map<String, Integer> actual = countByDescription(packed);
+        List<String> missing = difference(expected, actual);
+        List<String> extra = difference(actual, expected);
+        if (!missing.isEmpty() || !extra.isEmpty()) {
+            verified = false;
+            throw new WrongItemException("тапсырыста бар, бірақ қаптамада жоқ: " + show(missing)
+                    + "; қаптамада артық: " + show(extra));
+        }
+        verified = true;
+    }
+
+    private Map<String, Integer> countByDescription(List<MenuItem> list) {
+        Map<String, Integer> counts = new HashMap<>();
+        for (MenuItem item : list) {
+            counts.merge(item.getDescription(), 1, Integer::sum);
+        }
+        return counts;
+    }
+
+    /** a ішінде b-ге қарағанда артық кездесетін позициялар. */
+    private List<String> difference(Map<String, Integer> a, Map<String, Integer> b) {
+        List<String> result = new ArrayList<>();
+        for (Map.Entry<String, Integer> e : a.entrySet()) {
+            int diff = e.getValue() - b.getOrDefault(e.getKey(), 0);
+            for (int i = 0; i < diff; i++) {
+                result.add(e.getKey());
+            }
+        }
+        return result;
+    }
+
+    private String show(List<String> list) {
+        return list.isEmpty() ? "-" : String.join("; ", list);
+    }
+
     public void startCooking() {
         if (status != OrderStatus.NEW) {
             throw new IllegalStateException("Дайындауға тек NEW тапсырыс алынады, қазір: " + status);
@@ -91,6 +144,9 @@ public class Order implements Payable {
         if (status != OrderStatus.READY) {
             throw new IllegalStateException("Жеткізуге тек READY тапсырыс беріледі, қазір: " + status);
         }
+        if (!verified) {
+            throw new IllegalStateException("Тапсырыс тексерілмеген: алдымен қаптаманы тексеріңіз");
+        }
         if (courier == null) {
             throw new IllegalArgumentException("Курьер көрсетілмеген");
         }
@@ -100,6 +156,9 @@ public class Order implements Payable {
 
     public void complete() {
         OrderStatus required = delivery ? OrderStatus.DELIVERING : OrderStatus.READY;
+        if (!delivery && !verified) {
+            throw new IllegalStateException("Тапсырыс тексерілмеген: алдымен қаптаманы тексеріңіз");
+        }
         if (status != required) {
             throw new IllegalStateException("Аяқтау үшін статус " + required + " болуы керек, қазір: " + status);
         }
