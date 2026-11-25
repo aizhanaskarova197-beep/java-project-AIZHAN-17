@@ -42,8 +42,23 @@ public class ConsoleApp {
     private int nextOrderId = 1;
 
     public static void main(String[] args) {
+        fixWindowsConsole();
         System.setOut(new PrintStream(System.out, true, StandardCharsets.UTF_8));
         new ConsoleApp().run();
+    }
+
+    /** Windows терминалында қазақ әріптері дұрыс көрінуі үшін кодтауды UTF-8 (65001) етіп қояды. */
+    private static void fixWindowsConsole() {
+        if (!System.getProperty("os.name").toLowerCase(Locale.ROOT).contains("win")) {
+            return;
+        }
+        try {
+            new ProcessBuilder("cmd", "/c", "chcp 65001 >nul").inheritIO().start().waitFor();
+        } catch (IOException e) {
+            // кодтауды ауыстыру мүмкін болмаса, бағдарлама жұмысын жалғастырады
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
     }
 
     private void run() {

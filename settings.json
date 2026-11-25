@@ -1,0 +1,9 @@
+{
+    "terminal.integrated.profiles.windows": {
+        "PowerShell UTF8": {
+            "source": "PowerShell",
+            "args": ["-NoExit", "-Command", "chcp 65001 > $null"]
+        }
+    },
+    "terminal.integrated.defaultProfile.windows": "PowerShell UTF8"
+}
