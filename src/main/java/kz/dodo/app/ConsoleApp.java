@@ -346,7 +346,6 @@ public class ConsoleApp {
             }
         }
     }
-
     /** Демо: бір батырмамен проблема мен оның шешімін көрсетеді (файлдарға тимейді). */
     private void runDemo() {
         System.out.println();
